@@ -1,0 +1,15 @@
+[Unit]
+Description=Kong Gateway
+After=syslog.target network.target
+
+[Service]
+User=kong
+Group=kong
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/local/bin/kong start
+ExecStop=/usr/local/bin/kong stop
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
