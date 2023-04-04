@@ -1,2 +1,60 @@
 ---
 # tasks file for kong-gateway
+  tasks:
+    - name: Install required packages
+      apt:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - git
+        - make
+        - build-essential
+        - libpcre3-dev
+        - libssl-dev
+        - zlib1g-dev
+
+    - name: Clone Kong Gateway source
+      git:
+        repo: https://github.com/Kong/kong.git
+        dest: "{{ kong_dir }}"
+        version: "{{ kong_version }}"
+        update: no
+
+    - name: Build Kong Gateway
+      shell: |
+        cd "{{ kong_dir }}"
+        make install
+      async: 300
+      poll: 5
+      become_user: "{{ kong_user }}"
+      register: kong_build
+
+    - name: Wait for Kong Gateway build to complete
+      async_status:
+        jid: "{{ kong_build.ansible_job_id }}"
+        mode: wait
+
+    - name: Add kong user and group
+      user:
+        name: "{{ kong_user }}"
+        group: "{{ kong_group }}"
+        system: yes
+        shell: /sbin/nologin
+
+    - name: Create Kong Gateway directories
+      file:
+        path: "{{ item }}"
+        owner: "{{ kong_user }}"
+        group: "{{ kong_group }}"
+        mode: '0755'
+        state: directory
+      with_items:
+        - "{{ kong_dir }}"
+        - "{{ kong_dir }}/logs"
+
+    - name: Set up Kong Gateway auto-startup script
+      systemd:
+        name: kong
+        daemon_reload: yes
+        enabled: yes
+        state: started
