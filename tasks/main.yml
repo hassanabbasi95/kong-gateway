@@ -1,5 +1,8 @@
 ---
 # tasks file for kong-gateway
+- name: Install Kong Gateway
+  hosts: localhost
+  become: true
   tasks:
     - name: Install required packages
       apt:
