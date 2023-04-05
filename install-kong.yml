@@ -1,5 +1,6 @@
 ---
 - name: Install Kong Gateway
   hosts: localhost
+  become: true
   roles:
     - kong-gateway
