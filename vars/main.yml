@@ -1,7 +1,5 @@
 ---
-# vars file for kong-gateway
-  vars:
-    kong_version: 2.8.0
-    kong_dir: /usr/local/kong
-    kong_user: kong
-    kong_group: kong
+kong_version: "2.8.0"
+kong_install_dir: "/usr/local/bin"
+kong_config_dir: "/etc/kong"
+
