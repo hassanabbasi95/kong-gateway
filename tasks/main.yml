@@ -1,63 +1,57 @@
 ---
-# tasks file for kong-gateway
-- name: Install Kong Gateway
-  hosts: localhost
-  become: true
-  tasks:
-    - name: Install required packages
-      apt:
-        name: "{{ item }}"
-        state: present
-      with_items:
-        - git
-        - make
-        - build-essential
-        - libpcre3-dev
-        - libssl-dev
-        - zlib1g-dev
+- name: Install required packages
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - git
+    - wget
+    - make
+    - unzip
+    - libpcre3-dev
+    - zlib1g-dev
+    - libssl-dev
+    - gcc
 
-    - name: Clone Kong Gateway source
-      git:
-        repo: https://github.com/Kong/kong.git
-        dest: "{{ kong_dir }}"
-        version: "{{ kong_version }}"
-        update: no
+- name: Clone Kong Gateway source
+  git:
+    repo: "https://github.com/Kong/kong.git"
+    dest: "{{ kong_install_dir }}/kong"
+    version: "{{ kong_version }}"
+    clone_depth: 1
 
-    - name: Build Kong Gateway
-      shell: |
-        cd "{{ kong_dir }}"
-        make install
-      async: 300
-      poll: 5
-      become_user: "{{ kong_user }}"
-      register: kong_build
+- name: Build Kong Gateway from source
+  command: |
+    cd {{ kong_install_dir }}/kong
+    make dev
+    make install
 
-    - name: Wait for Kong Gateway build to complete
-      async_status:
-        jid: "{{ kong_build.ansible_job_id }}"
-        mode: wait
+- name: Set up auto-start script
+  copy:
+    dest: /etc/systemd/system/kong.service
+    content: |
+      [Unit]
+      Description=Kong Gateway
+      After=syslog.target network.target
 
-    - name: Add kong user and group
-      user:
-        name: "{{ kong_user }}"
-        group: "{{ kong_group }}"
-        system: yes
-        shell: /sbin/nologin
+      [Service]
+      User=root
+      Group=root
+      ExecStart={{ kong_install_dir }}/kong/bin/kong start -c {{ kong_config_dir }}/kong.conf
+      ExecReload={{ kong_install_dir }}/kong/bin/kong reload -c {{ kong_config_dir }}/kong.conf
+      KillMode=process
+      Restart=on-failure
+      RestartSec=5s
 
-    - name: Create Kong Gateway directories
-      file:
-        path: "{{ item }}"
-        owner: "{{ kong_user }}"
-        group: "{{ kong_group }}"
-        mode: '0755'
-        state: directory
-      with_items:
-        - "{{ kong_dir }}"
-        - "{{ kong_dir }}/logs"
+      [Install]
+      WantedBy=multi-user.target
 
-    - name: Set up Kong Gateway auto-startup script
-      systemd:
-        name: kong
-        daemon_reload: yes
-        enabled: yes
-        state: started
+  notify:
+    - reload systemd
+
+handlers:
+  - name: reload systemd
+    systemd:
+      daemon_reload: yes
+      state: restarted
+      name: kong
